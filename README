@@ -1,0 +1,41 @@
+HTC Vision Overclock Module
+Michael Huang (coolbho3k)
+
+This kernel module is capable of changing the maximum CPU speed of MSM7x30 and
+8x55 devices running Android, such as the HTC Vision and the T-Mobile G2. The
+current default presets are for T-Mobile G2 with HTC kernel 2.6.32.17, but the
+module can easily be modified to run on any device with the MSM7x30 or 8x55
+SoCs.
+
+To use it on a T-Mobile G2 with HTC kernel 2.6.32.17, run:
+
+insmod vision_oc.ko
+
+This will by default overclock the phone to 1017.6MHz at 1200mV. To overclock
+higher, run:
+
+insmod vision_oc.ko pll2_l_val=53
+
+Where pll2_l_val equals the speed you want the phone to run in MHz (in this
+case, 1017.6MHz again) divided by 19.2. My G2 runs at 1420.8MHz (pll_l_val=74)
+with relative stability.
+
+To also change the voltage at the highest speed, run:
+
+insmod vision_oc.ko pll2_l_val=X vdd_mv=1200 vdd_raw=242
+
+Where vdd_mv equals the voltage in mV and vdd_raw equals 224+(vdd_mv-750)/25.
+
+If you are not running a T-Mobile G2 with HTC kernel 2.6.32.17, you MUST also
+give the kernel some other configuration options too! Pull the file
+/proc/kallsyms and search for the address values of acpu_freq_tbl and 
+perflock_notifier_call. When loading the module, specify these addresses along
+with any other parameters:
+
+insmod vision_oc.ko acpu_freq_tbl_addr=0xc055e1a0
+perflock_notifier_call_addr=0xc006c974
+
+I highly recommend that you use SetCPU to limit the clock speed while the
+screen is off to 768MHz to prevent the phone from scaling up too high.
+Without the ability to flash custom kernels, we cannot add intermediate steps
+between 768MHz and the overclocked speed.
