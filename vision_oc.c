@@ -22,7 +22,7 @@
 
 #define DRIVER_AUTHOR "Michael Huang <coolbho3000@gmail.com>"
 #define DRIVER_DESCRIPTION "HTC Vision overclock module"
-#define DRIVER_VERSION "1.0"
+#define DRIVER_VERSION "1.1"
 
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESCRIPTION);
@@ -39,7 +39,7 @@ MODULE_LICENSE("GPL");
    speeds.
 */
 
-static uint pll2_l_val = 53; /* MSM8x55 spec. 19.2MHz * 53 = 1017.6MHz */
+static uint pll2_l_val = 53 ; /* MSM8x55 spec. 19.2MHz * 53 = 1017.6MHz */
 static uint vdd_mv = 1200; /* 1200mV */
 static uint vdd_raw = 242; /* 1200mV. VDD_RAW(x) = 224+(x-750)/25 */
 static uint acpu_freq_tbl_addr = 0xc055e1a0;
@@ -78,7 +78,7 @@ static struct clkctl_acpu_speed *acpu_freq_tbl;
    Perflock disabler is mandatory because the perflock driver is hard coded
    with the old freq values.
 */
-static char perflock_code[] =
+static char perflock_code[] __initdata =
 		"\x0d\xc0\xa0\xe1" //mov r12, sp
 		"\x00\xd8\x2d\xe9" //stmdb sp!, {r11, r12, lr, pc}
 		"\x04\xb0\x4c\xe2" //sub r11, r12, #4
@@ -89,45 +89,32 @@ static char perflock_code[] =
 static int __init vision_oc_init(void)
 {
 	int frequency_max;
+	frequency_max = (19200 * pll2_l_val);
+	policy = cpufreq_cpu_get(smp_processor_id());	
+	acpu_freq_tbl = (void*) acpu_freq_tbl_addr;
+	freq_table = cpufreq_frequency_get_table(smp_processor_id());
 
 	printk(KERN_INFO "vision_oc: %s version %s\n", DRIVER_DESCRIPTION, DRIVER_VERSION);
 	printk(KERN_INFO "vision_oc: by %s\n", DRIVER_AUTHOR);
 	printk(KERN_INFO "vision_oc: disabling perflock\n");
 
-	if(perflock_notifier_call_addr != 0x0)
-	{
-		unsigned char *func;
-		int i;
-		for(i = 0; i <= 19; i++)
-		{
-			func = (char *)perflock_notifier_call_addr+i;
-			*func = perflock_code[i];
-		}
-	}
+	memcpy((void*) perflock_notifier_call_addr, &perflock_code, sizeof(perflock_code));
 	
-	udelay(50);
-
-	printk(KERN_INFO "vision_oc: writing pll2 L val\n");
-
-	writel(pll2_l_val, PLL2_L_VAL_ADDR);
-	udelay(50);
-	
-	printk(KERN_INFO "vision_oc: fixing cpufreq tables\n");
-	
-	frequency_max = (19200 * pll2_l_val);
-
-	acpu_freq_tbl = (void*)acpu_freq_tbl_addr;
-	freq_table = cpufreq_frequency_get_table(smp_processor_id());	
+	printk(KERN_INFO "vision_oc: fixing cpufreq tables\n");	
 
 	acpu_freq_tbl[8].acpu_clk_khz = frequency_max;
   	acpu_freq_tbl[8].vdd_mv = vdd_mv;
    	acpu_freq_tbl[8].vdd_raw = vdd_raw;
   	freq_table[3].frequency = frequency_max;
 
-	policy = cpufreq_cpu_get(smp_processor_id());
-	policy->cpuinfo.min_freq = 245760;
+	printk(KERN_INFO "vision_oc: writing pll2 L val\n");
+
+	writel(pll2_l_val, PLL2_L_VAL_ADDR);
+	udelay(50);
+
+	policy->cpuinfo.min_freq = freq_table[0].frequency;
 	policy->cpuinfo.max_freq = frequency_max;
-	policy->min = 245760;
+	policy->min = freq_table[0].frequency;
 	policy->max = frequency_max;
 
 	return 0;
